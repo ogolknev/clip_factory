@@ -47,13 +47,18 @@ def extract_scene(
 ) -> None:
     """Вырезает сцену из видео используя ffmpeg."""
     duration_seconds = end_seconds - start_seconds
+    # Рекомендуемый порядок: -ss до -i для быстрого seek к ближайшему keyframe
+    # и использование copy для быстрой нарезки. Опции -avoid_negative_ts и -fflags
+    # помогают корректно выставить временные метки (уменьшают шанс черных/зависших кадров).
     command = [
         "ffmpeg",
-        "-i", video_path,
         "-ss", str(start_seconds),
+        "-i", video_path,
         "-t", str(duration_seconds),
         "-c:v", "copy",
         "-c:a", "copy",
+        "-avoid_negative_ts", "1",
+        "-fflags", "+genpts",
         "-y",
         output_path,
     ]
