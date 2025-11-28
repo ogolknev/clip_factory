@@ -73,6 +73,14 @@ JSON файл со списком сцен в формате:
 python extract_scenes.py /path/to/video.mp4 scenes.json
 ```
 
+Вы также можете задать директорию для вывода явно с помощью флага `--output` (или `-o`).
+Если директория не указана, файлы сохраняются в папку рядом с видео: `<video_stem>_scenes`.
+
+**Пример с указанием директории вывода:**
+```fish
+python extract_scenes.py /path/to/video.mp4 scenes.json --output /tmp/my_scenes
+```
+
 **Выход:**
 Создаёт папку `video_scenes/` рядом с видеофайлом с файлами:
 - `scene_001.mp4`
