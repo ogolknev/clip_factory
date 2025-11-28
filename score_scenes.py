@@ -19,7 +19,7 @@ import argparse
 import json
 import os
 import sys
-from pathlib import Path
+from typing import Any
 
 try:
     from openai import OpenAI
@@ -78,7 +78,7 @@ def load_scenes_with_transcription(json_path: str) -> dict:
     return data
 
 
-def score_scene_with_ai(segments: list[dict], client: any) -> int:
+def score_scene_with_ai(segments: list[dict], client: Any) -> int:
     """Получает оценку интересности от OpenAI API."""
     if not segments:
         return 0
@@ -113,7 +113,7 @@ def score_scene_with_ai(segments: list[dict], client: any) -> int:
         return 0
 
 
-def init_openai_client() -> any:
+def init_openai_client() -> Any:
     """Инициализирует OpenAI клиент."""
     if load_dotenv:
         load_dotenv()
