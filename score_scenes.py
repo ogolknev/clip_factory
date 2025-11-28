@@ -9,16 +9,27 @@
 - JSON объект с добавленными оценками интересности (0-100)
 - Опция для фильтрации только топ-N самых интересных сцен
 
-Метрики интересности:
-- Длина сегмента (длинные сегменты обычно важнее)
-- Плотность слов (много слов = больше информации)
-- Наличие вопросов, восклицаний и ключевых слов
+Методы скоринга:
+1. simple (по умолчанию) — метрики текста: длина, плотность, ключевые слова
+2. ai — анализ через OpenAI API (требует .env с OPENAI_API_KEY)
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+from pathlib import Path
+
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None  # type: ignore
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None  # type: ignore
 
 
 def calculate_scene_score(segments: list[dict]) -> int:
@@ -67,6 +78,59 @@ def load_scenes_with_transcription(json_path: str) -> dict:
     return data
 
 
+def score_scene_with_ai(segments: list[dict], client: any) -> int:
+    """Получает оценку интересности от OpenAI API."""
+    if not segments:
+        return 0
+
+    text = " ".join(seg.get("text", "").strip() for seg in segments)
+    if not text:
+        return 0
+
+    try:
+        response = client.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Ты оцениваешь интересность контента от 0 до 100. Возвращай только число без объяснений."
+                },
+                {
+                    "role": "user",
+                    "content": f"Оцени интересность этого текста (0-100):\n\n{text}"
+                }
+            ],
+            temperature=0.3,
+            max_tokens=10
+        )
+        score_text = response.choices[0].message.content.strip()
+        score = int(score_text.split()[0])
+        return max(0, min(100, score))
+    except (ValueError, IndexError):
+        return 0
+    except Exception as error:
+        print(f"Warning: AI scoring failed: {error}", file=sys.stderr)
+        return 0
+
+
+def init_openai_client() -> any:
+    """Инициализирует OpenAI клиент."""
+    if load_dotenv:
+        load_dotenv()
+
+    if OpenAI is None:
+        raise RuntimeError(
+            "OpenAI package is not installed. Install with: pip install openai python-dotenv")
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY not found in .env file. Please set it and try again.")
+
+    api_base = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
+    return OpenAI(api_key=api_key, base_url=api_base)
+
+
 def score_scenes(data: dict, top_n: int | None = None) -> dict:
     """Добавляет оценки интересности к сценам и фильтрует топ-N."""
     scenes = data.get("scenes", [])
@@ -96,6 +160,8 @@ def parse_args() -> argparse.Namespace:
                         help="Keep only top N most interesting scenes (default: 10)")
     parser.add_argument("--all", action="store_true",
                         help="Keep all scenes without filtering")
+    parser.add_argument("--use-ai", action="store_true",
+                        help="Use OpenAI API for scoring (requires .env with OPENAI_API_KEY)")
     return parser.parse_args()
 
 
@@ -117,6 +183,23 @@ def main() -> int:
             return 2
 
     try:
+        # Если используется AI скоринг
+        if args.use_ai:
+            client = init_openai_client()
+            scenes = data.get("scenes", [])
+            print("Scoring scenes with AI...", file=sys.stderr)
+            for idx, scene in enumerate(scenes, start=1):
+                segments = scene.get("segments", [])
+                score = score_scene_with_ai(segments, client)
+                scene["score"] = score
+                print(f"Scene {idx}: {score}", file=sys.stderr)
+        else:
+            # Используем простой скоринг
+            for scene in data.get("scenes", []):
+                segments = scene.get("segments", [])
+                scene["score"] = calculate_scene_score(segments)
+
+        # Сортируем и фильтруем
         top_n = None if args.all else args.top
         result = score_scenes(data, top_n=top_n)
     except Exception as error:

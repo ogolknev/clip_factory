@@ -1,3 +1,5 @@
 opencv-python>=4.7.0
 numpy>=1.25
 openai-whisper>=20230714
+openai>=1.0
+python-dotenv>=1.0
