@@ -87,6 +87,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Extract scenes from video using JSON scene data.")
     parser.add_argument("video", help="Path to input video file")
     parser.add_argument("json_scenes", help="Path to JSON file with scenes")
+    parser.add_argument("--output", "-o", help="Output directory to save scenes (default: <video_stem>_scenes)")
     return parser.parse_args()
 
 
@@ -108,7 +109,15 @@ def main() -> int:
         print(f"Error reading JSON: {error}", file=sys.stderr)
         return 1
 
-    output_dir = create_output_directory(args.video)
+    # Determine output directory: use provided one or default next to video
+    output_dir = args.output if getattr(args, "output", None) else create_output_directory(args.video)
+    # Ensure directory exists
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+    except Exception as error:
+        print(f"Error creating output directory: {error}", file=sys.stderr)
+        return 1
+
     print(f"Output directory: {output_dir}")
 
     try:
