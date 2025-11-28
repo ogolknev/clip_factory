@@ -14,3 +14,4 @@ build/
 *_scenes/
 .env
 input/
+output/
